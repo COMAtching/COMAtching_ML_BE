@@ -6,7 +6,7 @@ import numpy as np
 app = FastAPI()
 
 # Triton 서버의 REST API 주소를 설정합니다.
-TRITON_SERVER_URL = "your_triton_server_ip:8000"
+TRITON_SERVER_URL = "100.115.125.32:8000"
 
 class RecommendationRequest(BaseModel):
     user_index: int
