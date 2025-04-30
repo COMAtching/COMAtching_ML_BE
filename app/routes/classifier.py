@@ -31,12 +31,48 @@ async def classify_categories(request: Request):
 							await send_to_queue(None, props, response_content)
 							return JSONResponse(content=response_content, status_code=400)
 
-			result = subprocess.run(['python', classifier_file_path], capture_output=True, text=True)
+			if not isinstance(data["smallCategory"], list):
+					response_content = {"stateCode": "MTCH-002", "message": "smallCategory must be a list"}
+					await send_to_queue(None, props, response_content)
+					return JSONResponse(content=response_content, status_code=400)
+
+			command = ['python', classifier_file_path, '--uuid', data["uuid"], '--subcategory'] + data["smallCategory"]
+			result = subprocess.run(command, capture_output=True, text=True)
+
 			if result.returncode != 0:
 					response_content = {"stateCode": "MTCH-005", "message": "Error running classifier script"}
 					await send_to_queue(None, props, response_content)
 					response_content.update({"details": str(e)})
 					return JSONResponse(content=response_content, status_code=500)
+			ut_lines = result.stdout.strip().split('\n')
+			if len(output_lines) < 2:
+					response_content = {"stateCode": "MTCH-006", "message": "Invalid script output"}
+					await send_to_queue(None, props, response_content)
+					return JSONResponse(content=response_content, status_code=500)
+
+			# 출력에서 대분류 추출 (예: "대분류: 스포츠, 자기계발")
+			big_category_line = output_lines[1]
+			if not big_category_line.startswith("대분류: "):
+					response_content = {"stateCode": "MTCH-006", "message": "Invalid big category output"}
+					await send_to_queue(None, props, response_content)
+					return JSONResponse(content=response_content, status_code=500)
+
+			# 대분류 문자열을 리스트로 변환
+			big_categories = [cat.strip() for cat in big_category_line.replace("대분류: ", "").split(",")]
+
+			# 요청된 smallCategory 개수와 결과 개수 확인
+			if len(big_categories) == 1 and len(data["smallCategory"]) > 1:
+					# 단일 대분류를 smallCategory 개수만큼 반복
+					big_categories = [big_categories[0]] * len(data["smallCategory"])
+			elif len(big_categories) != len(data["smallCategory"]):
+					response_content = {"stateCode": "MTCH-006", "message": "Mismatch in category count"}
+					await send_to_queue(None, props, response_content)
+					return JSONResponse(content=response_content, status_code=500)
+
+			# 응답 형식 생성
+			response_content = {"bigCategory": big_categories}
+			await send_to_queue(None, props, response_content)
+			return JSONResponse(content=response_content, status_code=200)
 
 		except json.JSONDecodeError as e:
 			response_content = {"stateCode": "MTCH-003", "message": "Invalid JSON format"}
