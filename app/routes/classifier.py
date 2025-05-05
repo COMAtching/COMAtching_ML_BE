@@ -44,7 +44,7 @@ async def classify_categories(request: Request):
 					await send_to_queue(None, props, response_content)
 					response_content.update({"details": str(e)})
 					return JSONResponse(content=response_content, status_code=500)
-			ut_lines = result.stdout.strip().split('\n')
+			output_lines = result.stdout.strip().split('\n')
 			if len(output_lines) < 2:
 					response_content = {"stateCode": "MTCH-006", "message": "Invalid script output"}
 					await send_to_queue(None, props, response_content)
